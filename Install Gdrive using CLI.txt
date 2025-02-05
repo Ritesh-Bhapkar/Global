@@ -1,0 +1,14 @@
+#install gdrive CLI-
+
+wget -O gdrive.zip https://github.com/prasmussen/gdrive/releases/latest/download/gdrive-linux-x64.zip
+unzip gdrive.zip
+chmod +x gdrive
+sudo mv gdrive /usr/local/bin/
+
+#Authenticate with google drive-
+
+gdrive about
+
+#Run the script with
+
+bash backup_script.sh /path/to/your/project /path/to/backup/directory https://webhook.site/your-unique-url

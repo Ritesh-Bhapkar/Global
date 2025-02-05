@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# Configuration Variables
+PROJECT_FOLDER="$1" # Project folder passed as the first script parameter
+BACKUP_DIR="$2"     # Backup directory passed as the second script parameter
+KEEP_DAILY=7        # Number of daily backups to keep
+KEEP_WEEKLY=4       # Number of weekly backups to keep
+KEEP_MONTHLY=3      # Number of monthly backups to keep
+CURL_URL="$3"       # Optional cURL URL for notifications
+DISABLE_CURL=false  # Disable cURL request for testing purposes
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+
+# Create a timestamped backup
+create_backup() {
+    BACKUP_FILE="$BACKUP_DIR/backup_$TIMESTAMP.zip"
+    zip -r "$BACKUP_FILE" "$PROJECT_FOLDER"
+    echo "Backup created at: $BACKUP_FILE"
+    
+    # Upload to Google Drive
+    gdrive upload --parent "YOUR_GOOGLE_DRIVE_FOLDER_ID" "$BACKUP_FILE"
+    echo "Backup uploaded to Google Drive."
+
+    # Send a cURL request if enabled
+    if [ "$DISABLE_CURL" = false ]; then
+        curl -X POST -H "Content-Type: application/json" -d "{\"project\": \"$PROJECT_FOLDER\", \"date\": \"$TIMESTAMP\", \"test\": \"BackupSuccessful\"}" "$CURL_URL"
+        echo "Notification sent via cURL."
+    else
+        echo "cURL request disabled for testing."
+    fi
+}
+
+# Rotational Backup Strategy
+delete_old_backups() {
+    # Delete old daily backups
+    find "$BACKUP_DIR" -name "backup_*" -mtime +$KEEP_DAILY -exec rm {} \;
+    echo "Old daily backups deleted."
+
+    # Handle weekly backups
+    for i in $(seq 0 $(($KEEP_WEEKLY - 1))); do
+        find "$BACKUP_DIR" -name "backup_*" -daystart -type f -mtime +$((7 * (i + 1))) -exec rm {} \;
+    done
+    echo "Old weekly backups deleted."
+
+    # Handle monthly backups
+    for i in $(seq 0 $(($KEEP_MONTHLY - 1))); do
+        find "$BACKUP_DIR" -name "backup_*" -daystart -type f -mtime +$((30 * (i + 1))) -exec rm {} \;
+    done
+    echo "Old monthly backups deleted."
+}
+
+# Main script execution
+if [[ -d "$PROJECT_FOLDER" && -d "$BACKUP_DIR" ]]; then
+    create_backup
+    delete_old_backups
+else
+    echo "Invalid project folder or backup directory."
+    exit 1
+fi
